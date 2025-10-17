@@ -1,5 +1,5 @@
 # Algorithm 3.3 — Space-Saving（スペースセービング法）
-
+https://github.com/spatiotemporalData2025/TAKAKUWA_Masaki/blob/main/Algo1/algo3_3_space_saving.ipynb
 ## 概要
 常に `k` 個のカウンタをフルに活用し続ける。  
 新しい要素が来たときに枠が埋まっていたら、  
