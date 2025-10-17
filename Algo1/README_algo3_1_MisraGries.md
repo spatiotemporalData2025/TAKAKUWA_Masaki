@@ -1,5 +1,5 @@
 # Algorithm 3.1 — Misra–Gries（ミスラ・グリース法）
-
+https://github.com/spatiotemporalData2025/TAKAKUWA_Masaki/blob/main/Algo1/algo3_1_misra_gries.ipynb
 ## 概要
 データストリームから「頻出要素（heavy hitters）」を近似的に検出するアルゴリズム。  
 保持するカウンタの数を最大 `k-1` 個に制限し、メモリを節約しながら代表的な要素を抽出する。
