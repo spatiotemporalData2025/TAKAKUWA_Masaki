@@ -1,5 +1,5 @@
 # Algorithm 3.2 — Lossy Counting（ロッシー・カウンティング法）
-
+https://github.com/spatiotemporalData2025/TAKAKUWA_Masaki/blob/main/Algo1/algo3_2_lossy_counting.ipynb
 ## 概要
 データを一定区間（バケット）ごとに処理し、  
 出現頻度が少ない要素を**定期的にまとめて削除**する方式。  
