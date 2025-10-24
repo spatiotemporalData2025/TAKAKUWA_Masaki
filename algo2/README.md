@@ -35,14 +35,35 @@ R-treeは**空間的な包含関係（containment relationship）**を基盤に�
 
 ---
 
+## 3. 計算量の比較
+
+| 操作 | R-tree | B-tree | 備考 |
+|------|--------------------|-------------------|------|
+| **探索（Search）** | O(logₘN) ～ O(N<sup>1−1/d</sup>) | O(logₘN) | R-treeでは空間の次元数 d に依存．次元が高いほど重なりが増えやすく，探索コストが増加． |
+| **挿入（Insert）** | O(logₘN) | O(logₘN) | 分割処理（SplitNode）発生時に若干のオーバーヘッドあり． |
+| **削除（Delete）** | O(logₘN) | O(logₘN) | CondenseTree操作により，再挿入が必要な場合がある． |
+| **更新（Update）** | O(logₘN) + O(k) | O(logₘN) | R-treeでは位置変更時に削除＋挿入が発生． |
+| **空間使用効率** | 約70〜90%（ノード充填率） | 約50〜100% | R-treeは重なりを最小化する設計により比較的高い空間利用率を維持． |
+
+> ※ N：データ件数，m：ノードの最小エントリ数，d：次元数（2Dや3Dなど）
+
+R-treeは平均的にはB-treeと同程度の計算量で動作するが，空間次元が増えると重なりが増加し，探索性能が低下する（**次元の呪い**）という特徴がある．  
+そのため，実装時には**線形分割アルゴリズムやHilbert R-tree**などの改良版が利用されることが多い．
+
+---
+
 ### 参考
 > Antonin Guttman, “R-trees: A Dynamic Index Structure for Spatial Searching”, *Proceedings of the 1984 ACM SIGMOD International Conference on Management of Data*, pp.47–57, 1984．
 
+---
+
 <img width="1023" height="435" alt="image" src="https://github.com/user-attachments/assets/aeffdb77-bf07-436f-85bf-054323dc463b" />
 
-## 2. 基本操作の流れ
+---
 
-### 2.1 挿入（Insertion）
+## 4. 基本操作の流れ
+
+### 4.1 挿入（Insertion）
 
 挿入操作は，B木の挿入に類似しているが，「矩形の重なり最小化」を考慮する点が特徴である．  
 手順は以下の通り：
@@ -62,19 +83,23 @@ R-treeは**空間的な包含関係（containment relationship）**を基盤に�
 
 4. **ルート分割**  
    - ルートまで分割が波及した場合は，新たなルートを作成してツリーを1段高くする．
-  
+
+<img width="1024" height="747" alt="image" src="https://github.com/user-attachments/assets/b08e63da-993b-47fc-8f4f-17a68349c1cf" />
+
 ---
 
-### 2.2 検索（Search）
+### 4.2 検索（Search）
 
 検索は，指定した領域と重なるMBRをたどることで行う．
 
 1. ルートから探索を開始し，検索矩形と重なるMBRを持つノードだけを再帰的に探索する．  
 2. 葉ノードに到達したら，対象矩形と重なる実データを抽出する．
 
+<img width="1024" height="747" alt="image" src="https://github.com/user-attachments/assets/96974e9f-6a5b-41bb-bcb9-19a97a640152" />
+
 ---
 
-### 2.3 削除（Deletion）
+### 4.3 削除（Deletion）
 
 削除は，対象オブジェクトを含むノードを探し出して削除し，必要に応じて再調整を行う．
 
@@ -89,8 +114,14 @@ R-treeは**空間的な包含関係（containment relationship）**を基盤に�
 3. **ルート調整**  
    - ルートに子ノードが1つしか残らなければ，その子を新しいルートとする．
 
+---
+
+## 5. まとめ
+
 R-treeは，  
 - **多次元データ（点・線・面）**を効率的に管理し，  
 - **挿入・削除・探索が動的に可能な高さ平衡木**であり，  
 - **矩形の重なりを最小化するアルゴリズム設計**により高い空間検索性能を実現する．  
 
+また，B-treeなどの一次元構造と比較しても，平均計算量はほぼ同等でありながら，  
+**空間的データの処理能力に優れる**点で実用的価値が高い．
