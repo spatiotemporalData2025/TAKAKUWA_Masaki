@@ -37,3 +37,5 @@ R-treeは**空間的な包含関係（containment relationship）**を基盤に�
 
 ### 参考
 > Antonin Guttman, “R-trees: A Dynamic Index Structure for Spatial Searching”, *Proceedings of the 1984 ACM SIGMOD International Conference on Management of Data*, pp.47–57, 1984．
+
+<img width="1023" height="435" alt="image" src="https://github.com/user-attachments/assets/aeffdb77-bf07-436f-85bf-054323dc463b" />
