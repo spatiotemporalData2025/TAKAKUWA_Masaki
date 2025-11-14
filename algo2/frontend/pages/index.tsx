@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import Map from "../components/Map";
 
 type ApiResponse = {
@@ -209,6 +210,7 @@ export default function Home() {
             <div className="title">二人の中間地点からおすすめスポット</div>
             <div className="subtitle">OSM/Overpass × R-tree × MapLibre — 軽量で美しい地図体験</div>
           </div>
+          <Link href="/benchmark" style={{ color: '#007aff', textDecoration: 'none' }}>⚡ ベンチマーク →</Link>
         </div>
 
         <div className="grid cols-3 items-start">
