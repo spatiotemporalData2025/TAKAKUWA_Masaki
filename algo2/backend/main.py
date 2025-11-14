@@ -185,6 +185,16 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def linear_search_nearest(pois: List[dict], target_lat: float, target_lon: float, k: int) -> List[int]:
+    """線形探索で最近傍k件を取得（比較用）"""
+    distances = []
+    for i, p in enumerate(pois):
+        dist = _haversine_m(target_lat, target_lon, p["lat"], p["lon"])
+        distances.append((dist, i))
+    distances.sort(key=lambda x: x[0])
+    return [idx for _, idx in distances[:k]]
+
+
 def build_rtree(pois: List[dict]) -> Tuple[index.Index, List[dict]]:
     """POI を R-tree にインデックス。"""
     idx = index.Index()
@@ -414,3 +424,121 @@ def get_dataset(file_name: str):
             # YAML -> plain text for easy download/inspection
             return FileResponse(path=str(cand), media_type="text/yaml")
     raise HTTPException(status_code=404, detail="file not found")
+
+
+class BenchmarkResponse(BaseModel):
+    midpoint: Tuple[float, float]
+    total_pois: int
+    rtree_time_ms: float
+    linear_time_ms: float
+    speedup: float
+    rtree_results: List[Recommendation]
+    linear_results: List[Recommendation]
+
+
+@app.get("/benchmark", response_model=BenchmarkResponse)
+def benchmark_search(
+    lat1: float = Query(..., description="Person A latitude"),
+    lon1: float = Query(..., description="Person A longitude"),
+    lat2: float = Query(..., description="Person B latitude"),
+    lon2: float = Query(..., description="Person B longitude"),
+    category: str = Query("cafe", description="OSM amenity category"),
+    limit: int = Query(10, ge=1, le=50),
+    radius_m: Optional[int] = Query(None, ge=100, le=10000, description="Search radius in meters"),
+):
+    """
+    R-treeと線形探索の処理速度を比較する。
+    """
+    import time as time_module
+    
+    # 中間地点
+    mid_lat = (lat1 + lat2) / 2.0
+    mid_lon = (lon1 + lon2) / 2.0
+    
+    # 半径
+    auto_r = int(_haversine_m(lat1, lon1, lat2, lon2) / 2 + 400)
+    r_m = radius_m or max(800, min(3000, auto_r))
+    
+    try:
+        pois = fetch_pois(mid_lat, mid_lon, category, r_m)
+    except Exception as e:
+        print(f"Overpass error: {e}")
+        return {
+            "midpoint": (mid_lat, mid_lon),
+            "total_pois": 0,
+            "rtree_time_ms": 0,
+            "linear_time_ms": 0,
+            "speedup": 1.0,
+            "rtree_results": [],
+            "linear_results": [],
+        }
+    
+    if not pois:
+        return {
+            "midpoint": (mid_lat, mid_lon),
+            "total_pois": 0,
+            "rtree_time_ms": 0,
+            "linear_time_ms": 0,
+            "speedup": 1.0,
+            "rtree_results": [],
+            "linear_results": [],
+        }
+    
+    # 重複除去
+    deduped: List[dict] = []
+    seen: Dict[str, List[Tuple[float, float]]] = {}
+    for p in pois:
+        key = (p.get("name") or "Unnamed").strip().lower()
+        lst = seen.setdefault(key, [])
+        if any(_haversine_m(p["lat"], p["lon"], la, lo) < 30 for (la, lo) in lst):
+            continue
+        lst.append((p["lat"], p["lon"]))
+        deduped.append(p)
+    
+    k = min(limit, len(deduped))
+    
+    # R-tree検索
+    start = time_module.perf_counter()
+    idx, items = build_rtree(deduped)
+    nearest_ids_rtree = list(idx.nearest((mid_lon, mid_lat, mid_lon, mid_lat), k))
+    rtree_time = (time_module.perf_counter() - start) * 1000  # ms
+    
+    # 線形探索
+    start = time_module.perf_counter()
+    nearest_ids_linear = linear_search_nearest(deduped, mid_lat, mid_lon, k)
+    linear_time = (time_module.perf_counter() - start) * 1000  # ms
+    
+    # 結果整形
+    rtree_recs = [
+        {
+            "id": int(items[i]["id"]),
+            "name": items[i]["name"],
+            "category": items[i].get("category"),
+            "lat": items[i]["lat"],
+            "lon": items[i]["lon"],
+        }
+        for i in nearest_ids_rtree
+    ]
+    
+    linear_recs = [
+        {
+            "id": int(deduped[i]["id"]),
+            "name": deduped[i]["name"],
+            "category": deduped[i].get("category"),
+            "lat": deduped[i]["lat"],
+            "lon": deduped[i]["lon"],
+        }
+        for i in nearest_ids_linear
+    ]
+    
+    speedup = linear_time / rtree_time if rtree_time > 0 else 1.0
+    
+    return {
+        "midpoint": (mid_lat, mid_lon),
+        "total_pois": len(deduped),
+        "rtree_time_ms": round(rtree_time, 3),
+        "linear_time_ms": round(linear_time, 3),
+        "speedup": round(speedup, 2),
+        "rtree_results": rtree_recs,
+        "linear_results": linear_recs,
+    }
