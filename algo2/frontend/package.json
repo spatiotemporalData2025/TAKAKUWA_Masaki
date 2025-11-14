@@ -1,0 +1,20 @@
+{
+  "name": "r-tree-map",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+  "maplibre-gl": "^4.5.1",
+    "next": "14.2.33",
+    "react": "18",
+    "react-dom": "18"
+  },
+  "devDependencies": {
+    "@types/node": "24.9.2",
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}
