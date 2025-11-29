@@ -1,0 +1,21 @@
+# ST-DBSCAN Implementation Requirements
+
+# 基本的な数値計算
+numpy>=1.24.0
+
+# 可視化
+matplotlib>=3.7.0
+
+# アニメーション用（オプション）
+pillow>=10.0.0
+
+# データ処理（必須）
+pandas>=2.0.0
+
+# 高速化・可視化補助（オプション）
+scipy>=1.10.0
+numba>=0.57.0
+
+# インタラクティブ可視化用（可視化担当者向け・オプション）
+plotly>=5.0.0
+folium>=0.14.0
