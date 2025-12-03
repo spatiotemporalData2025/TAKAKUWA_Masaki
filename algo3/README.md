@@ -1,6 +1,6 @@
 # ST-DBSCAN実装: algo3プロジェクト
 
-> **最新の更新**: フォルダ構造を整理しました（2025/11/29）
+> **最新の更新**: 🎨 **可視化機能完成！** 雨雲レーダー風の可視化 + 可視化担当者への引き継ぎ完了（2025/12/03）
 
 <br>
 
@@ -16,11 +16,31 @@
 
 ### 👥 役割分担
 
-1. **データ取得する人** - 気象データの収集
-2. **ST-DBSCANを実装して降水地点のクラスタリングをする人** ← 現在の担当
-3. **クラスタリング結果から可視化する人** - 雨雲レーダー表示
+1. **データ取得する人** - 気象データの収集 ✅ **完了！**
+2. **ST-DBSCANを実装して降水地点のクラスタリングをする人** ✅ **完了！** 
+3. **クラスタリング結果から可視化する人** 🎨 **サンプル実装完了！引き継ぎ準備OK！**
 4. **効果測定する人** - 実行時間測定、検証
 5. **スライド作る人** - プレゼンテーション
+
+<br>
+
+### 🎉 実装完了機能
+
+#### 1. 実データ対応
+**データ取得担当者が実装した `weather_data.py` と統合完了！**
+
+- ✅ Open-Meteo APIから東京周辺の実際の気象データを取得
+- ✅ 5kmごと、1時間ごとの高解像度データ
+- ✅ 降雨量・雲量などのメトリクスに対応
+- ✅ `fetch_tokyo_data()` 関数でSTPointとして直接取得可能
+
+#### 2. 雨雲レーダー風可視化 🆕
+**クラスタリング結果を雨雲レーダーのように表示！**
+
+- ✅ 降水量に応じた色分け（青→緑→黄→赤）
+- ✅ クラスタごとの識別表示
+- ✅ 時間変化アニメーション（GIF）
+- ✅ 可視化担当者向けの完全なデータエクスポート
 
 <br>
 
@@ -32,32 +52,40 @@
 
 ```
 algo3/
-├── README.md                 # このファイル
-├── requirements.txt          # 必要なパッケージ
+├── README.md                          # このファイル
+├── requirements.txt                   # 必要なパッケージ
 │
-├── st_dbscan.py             # ST-DBSCANアルゴリズム実装
-├── export_utils.py          # データエクスポート機能
-├── font_config.py           # 日本語フォント設定
+├── st_dbscan.py                      # ST-DBSCANアルゴリズム実装
+├── weather_data.py                   # 🆕 気象データ取得（データ担当者作成）
+├── export_utils.py                   # データエクスポート機能
+├── font_config.py                    # 日本語フォント設定
 │
-├── docs/                    # ドキュメント
+├── docs/                             # ドキュメント
 │   ├── README_STDBSCAN.md
 │   ├── README_FOR_VISUALIZATION_TEAM.md
 │   ├── HANDOFF_TO_VISUALIZATION.md
 │   └── FONT_FIX_SUMMARY.md
 │
-├── examples/                # サンプルスクリプト
-│   ├── test_clustering.py
-│   └── visualization_sample.py
+├── data/                             # 🆕 気象データキャッシュ
+│   └── weather_2025-11-24_*.json     # Open-Meteo APIデータ
 │
-└── output/                  # 出力ファイル
-    ├── *.png                # 可視化画像
-    ├── *.gif                # アニメーション
-    └── visualization_data/  # エクスポートデータ
-        ├── clustering_result.csv
-        ├── clustering_result.json
-        ├── cluster_colors.json
-        ├── cluster_bounds.json
-        └── clusters_by_time.json
+├── examples/                          # サンプルスクリプト
+│   ├── test_clustering.py
+│   ├── visualization_sample.py
+│   ├── weather_clustering.py          # 🆕 実データクラスタリング
+│   └── weather_clustering_quickstart.py  # 🆕 クイックスタート
+│
+└── output/                            # 出力ファイル
+    ├── *.png                          # 可視化画像
+    ├── *.gif                          # アニメーション
+    ├── visualization_data/            # エクスポートデータ
+    │   ├── clustering_result.csv
+    │   ├── clustering_result.json
+    │   ├── cluster_colors.json
+    │   ├── cluster_bounds.json
+    │   └── clusters_by_time.json
+    └── weather_clustering/            # 🆕 実データ結果
+        └── (上記と同じ構造)
 ```
 
 <br>
@@ -70,27 +98,136 @@ algo3/
 
 <br>
 
-### 1. 環境構築
+### 🎯 最速で雨雲レーダー風可視化（推奨！）
 
 ```powershell
-# パッケージのインストール
+# 1. パッケージのインストール
 pip install -r requirements.txt
+
+# 2. examples フォルダに移動
+cd examples
+
+# 3. 可視化実行！
+python visualize_rain_clusters.py
+```
+
+**これだけで、実データから雨雲クラスタを検出・可視化できます！**
+
+**実行結果:**
+- 🖼️ 雨雲レーダー画像（PNG）
+- 🎬 時間変化アニメーション（GIF）
+- 📊 可視化用データ（CSV, JSON）
+
+出力先: `output/rain_radar_visualization/`
+
+<br>
+
+### 📚 その他の実行オプション
+
+#### クラスタリングのみ（軽量）
+```powershell
+# 超軽量版（6時間分、252ポイント、約1秒）
+python weather_clustering_lite.py
+```
+
+#### 可視化担当者向けデータ準備
+```powershell
+# 可視化用データのみエクスポート
+python visualize_rain_clusters.py
+# → output/rain_radar_visualization/ にデータ作成
 ```
 
 <br>
 
-### 2. テスト実行
+### 📚 その他のテストスクリプト
 
 ```powershell
-# examples フォルダに移動
-cd examples
+# 🎨 雨雲レーダー風可視化（推奨！）
+python visualize_rain_clusters.py
+# → 画像 + アニメーション + データエクスポート
 
-# クラスタリングのテスト
+# 超軽量版（6時間分、252ポイント、約1秒）- 動作確認に最適！
+python weather_clustering_lite.py
+
+# 最適化版（24時間分、7,467ポイント）- 処理時間：中程度
+python weather_clustering_optimized.py
+
+# 完全版（全期間、12,313ポイント）- 詳細な統計とエクスポート付き
+python weather_clustering.py
+
+# クイックスタート版（全データ）- シンプルな実装例
+python weather_clustering_quickstart.py
+
+# サンプルデータでのテスト
 python test_clustering.py
 
 # 可視化のサンプル
 python visualization_sample.py
 ```
+
+**💡 推奨フロー:**
+1. `visualize_rain_clusters.py` で可視化 🎨
+2. `weather_clustering_lite.py` でパラメータ調整
+3. 可視化担当者にデータを引き継ぎ
+
+<br>
+
+---
+
+<br>
+
+## 🌧️ 実データクラスタリングの使い方
+
+<br>
+
+### 基本的な使い方
+
+```python
+from st_dbscan import STDBSCAN
+from weather_data import fetch_tokyo_data
+
+# 1. 気象データを取得（Open-Meteo APIから）
+weather_points = fetch_tokyo_data(cache_dir='./data')
+print(f"取得: {len(weather_points)} 個の降水ポイント")
+
+# 2. ST-DBSCANでクラスタリング
+stdbscan = STDBSCAN(eps1=15.0, eps2=3600.0, min_pts=5)
+stdbscan.fit(weather_points)
+
+# 3. 結果を取得
+stats = stdbscan.get_statistics()
+print(f"検出されたクラスタ数: {stats['n_clusters']}")
+```
+
+<br>
+
+### データ取得のカスタマイズ
+
+```python
+from weather_data import fetch_weather_points
+
+# カスタム範囲・期間でデータ取得
+points = fetch_weather_points(
+    lat_min=34.0,           # 緯度範囲
+    lat_max=36.5,
+    lon_min=137.5,          # 経度範囲  
+    lon_max=140.5,
+    start_date='2025-11-20', # 期間
+    end_date='2025-11-30',
+    precipitation_threshold=0.5,  # 降水閾値 (mm/h)
+    cache_dir='./data'
+)
+```
+
+<br>
+
+### データの特徴
+
+- **空間解像度**: 約5km間隔のグリッド
+- **時間解像度**: 1時間ごと
+- **対象地域**: 東京周辺（デフォルト: 緯度34.5-36.0、経度138.0-140.0）
+- **期間**: 2025年11月24-29日（デフォルト）
+- **データソース**: Open-Meteo API（日本気象庁MSMモデル）
 
 <br>
 
@@ -153,10 +290,15 @@ python visualization_sample.py
 
 <br>
 
-#### 可視化担当者向け
-- **`HANDOFF_TO_VISUALIZATION.md`** - クイック引継ぎガイド ⭐
-  - 3分で始められる
-  - コードサンプル多数
+#### 可視化担当者向け 🎨
+- **`HANDOFF_TO_VISUALIZATION_v2.md`** - 最新引き継ぎガイド ⭐⭐ **NEW!**
+  - 雨雲レーダー風可視化の作り方
+  - データ形式の完全解説
+  - サンプルコード多数
+  - 3分で始められる！
+
+- **`HANDOFF_TO_VISUALIZATION.md`** - クイック引継ぎガイド
+  - 基本的な使い方
   - おすすめ！
 
 - **`README_FOR_VISUALIZATION_TEAM.md`** - 詳細ガイド
@@ -202,13 +344,52 @@ python font_config.py
 
 <br>
 
-### クラスタリング担当 → 可視化担当
+### クラスタリング担当 → 可視化担当 🎨
 
-1. `examples/test_clustering.py` を実行
-2. `output/visualization_data/` フォルダが生成される
-3. 可視化担当者に以下を共有：
-   - `output/visualization_data/` フォルダ
-   - `docs/HANDOFF_TO_VISUALIZATION.md` ⭐
+#### ステップ1: データ準備（クラスタリング担当）
+```powershell
+cd examples
+python visualize_rain_clusters.py
+```
+
+これで以下が自動生成されます：
+- 📊 **CSV/JSONデータ** - `output/rain_radar_visualization/`
+- 🖼️ **可視化サンプル** - 雨雲レーダー画像 & アニメーション
+- 📋 **メタデータ** - クラスタ情報、色情報、境界情報
+
+#### ステップ2: データの確認（可視化担当）
+```python
+import pandas as pd
+
+# データ読み込み
+df = pd.read_csv('output/rain_radar_visualization/clustering_result.csv')
+
+# カラム: id, lat, lon, time, value, cluster, is_noise
+print(df.head())
+```
+
+#### ステップ3: 独自の可視化作成（可視化担当）
+```python
+import matplotlib.pyplot as plt
+
+# 時刻0のデータを取得
+time_data = df[df['time'] == df['time'].unique()[0]]
+clusters = time_data[time_data['cluster'] > 0]
+
+# 雨雲レーダー風にプロット
+plt.scatter(clusters['lon'], clusters['lat'],
+           c=clusters['cluster'], s=clusters['value']*30,
+           cmap='tab20', alpha=0.7)
+plt.xlabel('経度')
+plt.ylabel('緯度')
+plt.title('雨雲クラスタ')
+plt.colorbar(label='クラスタID')
+plt.show()
+```
+
+#### 参考ドキュメント
+- 📘 **`docs/HANDOFF_TO_VISUALIZATION_v2.md`** - 完全ガイド ⭐
+- 📗 **`examples/visualize_rain_clusters.py`** - 実装サンプル
 
 <br>
 
@@ -217,6 +398,40 @@ python font_config.py
 <br>
 
 ## 💡 使い方の例
+
+<br>
+
+### 雨雲レーダー風可視化 🆕
+
+```python
+from st_dbscan import STDBSCAN
+from weather_data import fetch_tokyo_data
+from export_utils import ClusteringResultExporter
+
+# 1. データ取得
+weather_points = fetch_tokyo_data(cache_dir='./data')
+
+# 2. クラスタリング
+stdbscan = STDBSCAN(eps1=25.0, eps2=7200.0, min_pts=5)
+stdbscan.fit(weather_points)
+
+# 3. 可視化用データをエクスポート
+exporter = ClusteringResultExporter(stdbscan)
+exporter.export_for_visualization(output_dir='./output/viz_data')
+
+# 4. 可視化（matplotlibなど）
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = exporter.to_dataframe()
+time_data = df[df['time'] == df['time'].unique()[0]]
+clusters = time_data[time_data['cluster'] > 0]
+
+plt.scatter(clusters['lon'], clusters['lat'],
+           c=clusters['cluster'], s=clusters['value']*30,
+           cmap='tab20', alpha=0.7)
+plt.show()
+```
 
 <br>
 
