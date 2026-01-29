@@ -40,7 +40,7 @@ df = pd.read_csv('bike_log.csv')
 print(f"✓ {len(df):,} 件のレコード読み込み完了")
 
 # ========================================
-# 2. R-tree ベンチマーク検証
+# 2. R-tree ベンチマーク検証（改善版）
 # ========================================
 print("\n[2/5] R-tree ベンチマーク検証中...")
 
@@ -48,15 +48,8 @@ print("\n[2/5] R-tree ベンチマーク検証中...")
 min_lat, max_lat = 35.64, 35.72
 min_lon, max_lon = 139.73, 139.81
 
-# 線形探索時間測定
-start = time.time()
-linear_results = df[
-    (df['latitude'] >= min_lat) & (df['latitude'] <= max_lat) &
-    (df['longitude'] >= min_lon) & (df['longitude'] <= max_lon)
-]
-linear_time = time.time() - start
-
-# R-tree構築と検索時間測定
+# R-treeを事前構築（構築時間は除外）
+print("  R-treeインデックスを構築中...")
 p = index.Property()
 p.dimension = 2
 idx = index.Index(interleaved=True, properties=p)
@@ -64,43 +57,81 @@ idx = index.Index(interleaved=True, properties=p)
 for i, row in df.iterrows():
     idx.insert(i, (row['latitude'], row['longitude']))
 
-start = time.time()
+print("  ✓ インデックス構築完了")
+
+# 複数回検索を実施して平均時間を測定（より正確な比較）
+num_trials = 100
+print(f"  {num_trials}回の検索を実施中...")
+
+# 線形探索時間測定（100回平均）
+linear_times = []
+for _ in range(num_trials):
+    start = time.time()
+    linear_results = df[
+        (df['latitude'] >= min_lat) & (df['latitude'] <= max_lat) &
+        (df['longitude'] >= min_lon) & (df['longitude'] <= max_lon)
+    ]
+    linear_times.append(time.time() - start)
+linear_time = np.mean(linear_times)
+
+# R-tree検索時間測定（100回平均、構築時間除外）
+rtree_times = []
 rtree_bbox = (min_lat, min_lon, max_lat, max_lon)
-rtree_results = list(idx.intersection(rtree_bbox))
-rtree_time = time.time() - start
+for _ in range(num_trials):
+    start = time.time()
+    rtree_results = list(idx.intersection(rtree_bbox))
+    rtree_times.append(time.time() - start)
+rtree_time = np.mean(rtree_times)
 
 speedup = linear_time / rtree_time
 
-print(f"✓ 線形探索: {linear_time*1000:.3f}ms (結果: {len(linear_results):,} 件)")
-print(f"✓ R-tree検索: {rtree_time*1000:.3f}ms (結果: {len(rtree_results):,} 件)")
+print(f"✓ 線形探索: {linear_time*1000:.4f}ms (平均、結果: {len(linear_results):,} 件)")
+print(f"✓ R-tree検索: {rtree_time*1000:.4f}ms (平均、結果: {len(rtree_results):,} 件)")
 print(f"✓ 高速化率: {speedup:.1f}倍")
 
-# ベンチマーク画像生成
-fig, ax = plt.subplots(figsize=(10, 6))
+# ベンチマーク画像生成（改善版レイアウト）
+fig, ax = plt.subplots(figsize=(12, 7))
 methods = ['線形探索', 'R-tree']
 times = [linear_time * 1000, rtree_time * 1000]
-colors = ['#ff7f0e', '#2ca02c']
-bars = ax.bar(methods, times, color=colors, alpha=0.8, edgecolor='black', linewidth=2)
+colors = ['#e74c3c', '#27ae60']  # より鮮やかな色
+bars = ax.bar(methods, times, color=colors, alpha=0.85, edgecolor='black', linewidth=2.5, width=0.6)
 
 # バーの上に値を表示
 for bar, time_val in zip(bars, times):
     height = bar.get_height()
-    ax.text(bar.get_x() + bar.get_width()/2., height,
-            f'{time_val:.3f}ms', ha='center', va='bottom', fontsize=12, fontweight='bold')
+    ax.text(bar.get_x() + bar.get_width()/2., height + max(times) * 0.02,
+            f'{time_val:.4f}ms', ha='center', va='bottom', 
+            fontsize=13, fontweight='bold', color='black')
 
-ax.set_ylabel('検索時間 (ms)', fontsize=12, fontweight='bold')
-ax.set_title('R-tree による空間検索の高速化\n43,130レコード × ビューポート検索', fontsize=14, fontweight='bold')
-ax.set_ylim(0, linear_time * 1000 * 1.2)
-ax.grid(axis='y', alpha=0.3, linestyle='--')
+ax.set_ylabel('検索時間 (ミリ秒)', fontsize=13, fontweight='bold')
+ax.set_title('R-tree による空間検索の高速化\n43,130レコード × ビューポート検索 (100回平均)', 
+            fontsize=15, fontweight='bold', pad=20)
+ax.set_ylim(0, max(times) * 1.25)
+ax.grid(axis='y', alpha=0.3, linestyle='--', linewidth=1.2)
 
-# 高速化率をテキストボックスで追加
-textstr = f'高速化率: {speedup:.1f}倍'
-ax.text(0.98, 0.97, textstr, transform=ax.transAxes,
-        fontsize=13, verticalalignment='top', horizontalalignment='right',
-        bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
+# 高速化率をテキストボックスで追加（見やすく）
+if speedup >= 1:
+    speedup_color = '#27ae60'
+    speedup_text = f'高速化率: {speedup:.1f}倍 ⚡'
+else:
+    speedup_color = '#e67e22'
+    speedup_text = f'処理時間比: {speedup:.2f}倍'
+
+ax.text(0.98, 0.95, speedup_text, transform=ax.transAxes,
+        fontsize=14, verticalalignment='top', horizontalalignment='right',
+        bbox=dict(boxstyle='round,pad=0.8', facecolor=speedup_color, 
+                  alpha=0.85, edgecolor='black', linewidth=2),
+        fontweight='bold', color='white', zorder=10)
+
+# 測定条件を追加
+condition_text = f'測定条件:\n・検索回数: {num_trials}回\n・結果件数: {len(linear_results):,}件'
+ax.text(0.02, 0.95, condition_text, transform=ax.transAxes,
+        fontsize=10, verticalalignment='top',
+        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='gray'),
+        zorder=10)
 
 plt.tight_layout()
-plt.savefig('benchmark_result.png', dpi=150, bbox_inches='tight')
+plt.savefig('benchmark_result.png', dpi=200, bbox_inches='tight', facecolor='white')
 plt.close()
 print("✓ benchmark_result.png を生成しました")
 

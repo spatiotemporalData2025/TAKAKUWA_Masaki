@@ -51,10 +51,19 @@ def create_heatmap_animation():
     print("\nデータを読み込んでいます...")
     df = pd.read_csv('bike_log_donut.csv')
     df['timestamp'] = pd.to_datetime(df['timestamp'])
+    print(f"  - 全データ: {len(df)} 件")
+    
+    # 平日6-21時のみに絞り込み
+    df = df[(df['timestamp'].dt.hour >= 6) & (df['timestamp'].dt.hour <= 21)].copy()
+    print(f"  - 6-21時フィルタ後: {len(df)} 件")
+    
+    # 東京23区の範囲に限定（bike_log_donut.csvは既に23区内データなのでスキップ）
+    # すべてのデータが既に23区内にあるため、フィルタは不要
     
     # ユニークな時刻を取得
     unique_times = sorted(df['timestamp'].unique())
     print(f"  - データ期間: {unique_times[0]} ～ {unique_times[-1]}")
+    print(f"  - 対象時間帯: 平日6時～21時")
     print(f"  - フレーム数: {len(unique_times)}")
     
     # 緯度経度の範囲
@@ -149,43 +158,17 @@ def create_heatmap_animation():
                 method='linear', fill_value=0
             )
         
-        # ヒートマップを描画（半透明）
+        # ヒートマップを描画（やや濃いめ）
         heatmap = ax.contourf(
             grid_x, grid_y, grid_bikes,
-            levels=20, cmap='YlOrRd', alpha=0.4, vmin=0, vmax=35
+            levels=20, cmap='YlOrRd', alpha=0.7, vmin=0, vmax=35
         )
         
-        # ステーション位置をプロット
-        # 都心部と郊外部で色分け
-        df_downtown = df_current[df_current['area_type'] == 'downtown']
-        df_suburb = df_current[df_current['area_type'] == 'suburb']
-        
-        # 都心部ステーション（赤）
-        scatter1 = ax.scatter(
-            df_downtown['x_mercator'], df_downtown['y_mercator'],
-            c=df_downtown['free_bikes'], s=300, cmap='Reds',
-            edgecolors='black', linewidths=2.5, vmin=0, vmax=35,
-            marker='s', label='都心部', alpha=0.95, zorder=5
-        )
-        
-        # 郊外部ステーション（青）
-        scatter2 = ax.scatter(
-            df_suburb['x_mercator'], df_suburb['y_mercator'],
-            c=df_suburb['free_bikes'], s=300, cmap='Blues',
-            edgecolors='black', linewidths=2.5, vmin=0, vmax=35,
-            marker='o', label='郊外部', alpha=0.95, zorder=5
-        )
-        
-        # ステーションに自転車数を表示
-        for idx, row in df_current.iterrows():
-            ax.text(
-                row['x_mercator'], row['y_mercator'],
-                f"{int(row['free_bikes'])}", 
-                fontsize=9, ha='center', va='center',
-                color='white', fontweight='bold',
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.8),
-                zorder=6
-            )
+        # カラーバーを追加
+        if frame_idx == 0:  # 最初のフレームのみ
+            cbar = plt.colorbar(heatmap, ax=ax, fraction=0.03, pad=0.02)
+            cbar.set_label('自転車台数', fontsize=12, fontweight='bold')
+            cbar.ax.tick_params(labelsize=10)
         
         # タイトルと情報
         hour = current_time.hour
@@ -198,8 +181,12 @@ def create_heatmap_animation():
         # 統計情報を表示
         total_bikes = df_current['free_bikes'].sum()
         avg_bikes = df_current['free_bikes'].mean()
-        downtown_avg = df_downtown['free_bikes'].mean()
-        suburb_avg = df_suburb['free_bikes'].mean()
+        
+        # エリア別平均を計算
+        df_downtown = df_current[df_current['area_type'] == 'downtown']
+        df_suburb = df_current[df_current['area_type'] == 'suburb']
+        downtown_avg = df_downtown['free_bikes'].mean() if len(df_downtown) > 0 else 0
+        suburb_avg = df_suburb['free_bikes'].mean() if len(df_suburb) > 0 else 0
         
         stats_text = f'総台数: {int(total_bikes)} | 平均: {avg_bikes:.1f}台\n'
         stats_text += f'都心部平均: {downtown_avg:.1f}台 | 郊外部平均: {suburb_avg:.1f}台'
@@ -212,32 +199,30 @@ def create_heatmap_animation():
             zorder=10
         )
         
-        # 時間帯の説明
+        # 時間帯の説明とドーナツ化現象の強調
         if 7 <= hour < 9:
-            period_text = '朝ラッシュ: 通勤時間帯'
+            period_text = '早朝: 郊外密集 / 都心ほぼ0'
             period_color = 'yellow'
         elif 18 <= hour < 20:
-            period_text = '夕方ラッシュ: 帰宅時間帯'
+            period_text = '夕方: 都心→郊外へ移動中'
             period_color = 'orange'
         elif 9 <= hour < 18:
-            period_text = '日中: 業務時間帯'
+            period_text = '日中: 都心密集 / 郊外ほぼ0'
             period_color = 'lightblue'
         else:
-            period_text = '深夜・早朝: 低活動時間帯'
+            period_text = '夜間: 郊外に集中'
             period_color = 'lightgray'
         
         ax.text(
             0.98, 0.98, period_text,
             transform=ax.transAxes,
-            fontsize=13, verticalalignment='top', horizontalalignment='right',
+            fontsize=14, verticalalignment='top', horizontalalignment='right',
             bbox=dict(boxstyle='round', facecolor=period_color, alpha=0.9, edgecolor='black', linewidth=2),
             fontweight='bold',
             zorder=10
         )
         
-        # 凡例
-        ax.legend(loc='upper right', fontsize=11, framealpha=0.9, edgecolor='black', 
-                  bbox_to_anchor=(0.98, 0.92))
+        # 凡例削除（ヒートマップのみなので不要）
         
         # 軸ラベルを削除（地図なので不要）
         ax.set_xlabel('')
@@ -260,12 +245,12 @@ def create_heatmap_animation():
     print("\nアニメーションを生成中...")
     
     # アニメーション作成
-    # フレーム数を間引いて高速化（1時間ごとに表示）
-    frame_indices = range(0, len(unique_times), 6)  # 10分間隔×6 = 1時間ごと
+    # フレーム数を間引いて高速化（30分ごとに表示）
+    frame_indices = range(0, len(unique_times), 3)  # 10分間隔×3 = 30分ごと
     
     anim = FuncAnimation(
         fig, animate, init_func=init,
-        frames=frame_indices, interval=500, blit=False, repeat=True
+        frames=frame_indices, interval=625, blit=False, repeat=True
     )
     
     # 動画保存
@@ -274,7 +259,7 @@ def create_heatmap_animation():
         # MP4で保存を試みる
         print("  MP4形式で保存中...")
         output_file = 'donut_heatmap_osm_animation.mp4'
-        writer = FFMpegWriter(fps=2, bitrate=2400)
+        writer = FFMpegWriter(fps=1.6, bitrate=2400)
         anim.save(output_file, writer=writer, dpi=100)
         print(f"✓ {output_file} を保存しました")
     except Exception as e:
@@ -283,7 +268,7 @@ def create_heatmap_animation():
             # GIFで保存
             print("  GIF形式で保存中...")
             output_file = 'donut_heatmap_osm_animation.gif'
-            writer = PillowWriter(fps=2)
+            writer = PillowWriter(fps=1.6)
             anim.save(output_file, writer=writer, dpi=80)
             print(f"✓ {output_file} を保存しました")
         except Exception as e2:
@@ -298,15 +283,18 @@ def create_heatmap_animation():
     print("=" * 60)
     if output_file:
         print(f"\n出力ファイル: {output_file}")
-        print(f"フレーム数: {len(frame_indices)} (1時間ごと)")
-        print(f"再生速度: 2フレーム/秒")
+        print(f"フレーム数: {len(frame_indices)} (30分ごと)")
+        print(f"再生速度: 1.6フレーム/秒 (0.8倍速)")
         print("\n動画の特徴:")
+        print("  - 対象エリア: 東京23区のみ")
+        print("  - 対象時間: 平日6時～21時")
         print("  - 背景地図: OpenStreetMap")
-        print("  - 都心部ステーション: 赤い四角")
-        print("  - 郊外部ステーション: 青い円")
-        print("  - ヒートマップ: 自転車台数の空間分布（半透明）")
-        print("  - 朝ラッシュ: 都心部が減少、郊外部が増加")
-        print("  - 夕方ラッシュ: 都心部が増加、郊外部が減少")
+        print("  - ヒートマップのみ表示（ステーション非表示）")
+        print("  - カラーマップ: YlOrRd（黄→オレンジ→赤）")
+        print("  \n【ドーナツ化現象（顕著）】")
+        print("  - 早朝(6-9時): 郊外に密集 / 都心ほぼ0")
+        print("  - 日中(9-18時): 都心に密集 / 郊外ほぼ0")
+        print("  - 夕方(18-21時): 都心→郊外へ移動")
 
 if __name__ == "__main__":
     create_heatmap_animation()
