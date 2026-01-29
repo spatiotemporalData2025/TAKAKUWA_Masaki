@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+requests
+scikit-learn
+numpy
+jinja2
+rtree

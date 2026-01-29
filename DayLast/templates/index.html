@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自転車シェアリング リアルタイム分析</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+        #map {
+            flex: 1;
+            height: 100vh;
+        }
+        #sidebar {
+            width: 350px;
+            background: white;
+            overflow-y: auto;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        h2 {
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #555;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+        }
+        .info-box {
+            background: #f9f9f9;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #2196F3;
+        }
+        .ranking-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .cluster-info {
+            background: #fff3cd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 4px solid #ffc107;
+        }
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="map"></div>
+        <div id="sidebar">
+            <h1>🚲 自転車シェアリング分析</h1>
+            <div class="info-box">
+                <strong>データソース:</strong> ドコモ・バイクシェア (東京都心)<br>
+                <strong>更新間隔:</strong> 30秒<br>
+                <strong>実装アルゴリズム:</strong>
+                <ul style="margin-top: 5px;">
+                    <li>R-tree 空間インデックス</li>
+                    <li>DBSCAN クラスタリング</li>
+                    <li>Space Saving 頻出検出</li>
+                </ul>
+            </div>
+            
+            <h2>🔴 自転車ゼロ密集地域</h2>
+            <div id="clusters-info">読み込み中...</div>
+            
+            <h2>📊 利用頻度ランキング</h2>
+            <div id="ranking-info">読み込み中...</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 地図初期化（東京駅周辺）
+        const map = L.map('map').setView([35.6812, 139.7671], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 凡例追加
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function() {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <h3 style="margin-bottom: 5px;">凡例</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4CAF50;"></div>
+                    <span>利用可能 (5台以上)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FFC107;"></div>
+                    <span>少ない (1-4台)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #F44336;"></div>
+                    <span>なし (0台)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF6B6B; opacity: 0.3;"></div>
+                    <span>ゼロ密集地域</span>
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        let stationMarkers = [];
+        let clusterCircles = [];
+
+        // ステーションの色を決定
+        function getStationColor(freeBikes) {
+            if (freeBikes === 0) return '#F44336';
+            if (freeBikes <= 4) return '#FFC107';
+            return '#4CAF50';
+        }
+
+        // ステーションマーカー更新
+        function updateStations() {
+            const bounds = map.getBounds();
+            const params = new URLSearchParams({
+                min_lon: bounds.getWest(),
+                min_lat: bounds.getSouth(),
+                max_lon: bounds.getEast(),
+                max_lat: bounds.getNorth()
+            });
+
+            fetch(`/api/search?${params}`)
+                .then(res => res.json())
+                .then(data => {
+                    // 既存マーカークリア
+                    stationMarkers.forEach(m => map.removeLayer(m));
+                    stationMarkers = [];
+
+                    // 新しいマーカー追加
+                    data.stations.forEach(st => {
+                        const color = getStationColor(st.free_bikes);
+                        const marker = L.circleMarker([st.latitude, st.longitude], {
+                            radius: 8,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                        
+                        marker.bindPopup(`
+                            <strong>${st.name}</strong><br>
+                            🚲 利用可能: ${st.free_bikes}台<br>
+                            🅿️ 空きスロット: ${st.empty_slots}個
+                        `);
+                        
+                        marker.addTo(map);
+                        stationMarkers.push(marker);
+                    });
+                })
+                .catch(err => console.error('Station fetch error:', err));
+        }
+
+        // 分析結果更新
+        function updateAnalysis() {
+            fetch('/api/analysis')
+                .then(res => res.json())
+                .then(data => {
+                    // クラスタ表示
+                    clusterCircles.forEach(c => map.removeLayer(c));
+                    clusterCircles = [];
+
+                    const clusterGroups = {};
+                    data.clusters.forEach(c => {
+                        if (!clusterGroups[c.cluster_id]) {
+                            clusterGroups[c.cluster_id] = [];
+                        }
+                        clusterGroups[c.cluster_id].push([c.lat, c.lon]);
+                    });
+
+                    let clustersHtml = '';
+                    Object.keys(clusterGroups).forEach(id => {
+                        const points = clusterGroups[id];
+                        const centerLat = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+                        const centerLon = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+                        
+                        const circle = L.circle([centerLat, centerLon], {
+                            radius: 500,
+                            color: '#FF6B6B',
+                            fillColor: '#FF6B6B',
+                            fillOpacity: 0.2,
+                            weight: 2
+                        });
+                        circle.bindPopup(`クラスタ ${id}<br>${points.length}ステーション`);
+                        circle.addTo(map);
+                        clusterCircles.push(circle);
+
+                        clustersHtml += `<div class="cluster-info">
+                            クラスタ ${id}: ${points.length}ステーション
+                        </div>`;
+                    });
+
+                    document.getElementById('clusters-info').innerHTML = 
+                        clustersHtml || '<div style="color: #999;">密集地域なし</div>';
+
+                    // ランキング表示
+                    let rankingHtml = '';
+                    data.ranking.forEach((item, idx) => {
+                        rankingHtml += `<div class="ranking-item">
+                            <strong>${idx + 1}.</strong> ${item[0]}<br>
+                            <small>変動回数: ${item[1]}</small>
+                        </div>`;
+                    });
+                    
+                    document.getElementById('ranking-info').innerHTML = 
+                        rankingHtml || '<div style="color: #999;">データ収集中...</div>';
+                })
+                .catch(err => console.error('Analysis fetch error:', err));
+        }
+
+        // イベントリスナー
+        map.on('moveend', updateStations);
+        
+        // 初回ロードと定期更新
+        updateStations();
+        updateAnalysis();
+        setInterval(updateStations, 30000);
+        setInterval(updateAnalysis, 30000);
+    </script>
+</body>
+</html>
