@@ -204,8 +204,7 @@ def visualize_donut_pattern():
     
     ax6.text(0.1, 0.95, summary_text, transform=ax6.transAxes,
              fontsize=11, verticalalignment='top',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3),
-             family='monospace')
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
     
     plt.tight_layout()
     plt.savefig('donut_6_summary.png', dpi=300, bbox_inches='tight')
