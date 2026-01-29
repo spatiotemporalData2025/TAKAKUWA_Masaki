@@ -3,5 +3,10 @@ uvicorn
 requests
 scikit-learn
 numpy
+pandas
+matplotlib
+seaborn
+scipy
+contextily
 jinja2
 rtree
