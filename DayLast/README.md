@@ -51,10 +51,6 @@ DayLast/
 ├── requirements.txt                    # Python依存パッケージ
 └── README.md                           # このファイル
 ```
-├── bike_log_tokyo.csv              # テストデータ（東京都心）
-├── requirements.txt                    # Python依存パッケージ
-└── README.md                           # このファイル
-```
 
 ## 実装手法
 
@@ -103,7 +99,7 @@ DayLast/
 各エリアの最少・最多時刻、変動幅、平均台数などの統計情報。
 
 ### OpenStreetMap地図動画
-![地図動画](donut_heatmap_osm_animation.mp4)
+動画ファイル: [donut_heatmap_osm_animation.mp4](donut_heatmap_osm_animation.mp4)
 OpenStreetMapを背景に、自転車台数の時空間変化を24時間で可視化。
 
 ## 実験結果
