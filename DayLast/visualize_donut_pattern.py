@@ -1,6 +1,7 @@
 """
 ドーナツ化現象の可視化スクリプト
 都心部と郊外部の時間帯別変動パターンを可視化
+各グラフを個別に保存
 """
 
 import pandas as pd
@@ -8,13 +9,27 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from matplotlib import font_manager
+import matplotlib
+import sys
 
-# 日本語フォント設定
-plt.rcParams['font.sans-serif'] = ['MS Gothic', 'Yu Gothic', 'Meiryo', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
+# 日本語フォント設定を改善
+def setup_japanese_font():
+    """日本語フォントを適切に設定"""
+    # Windowsの場合
+    if sys.platform == 'win32':
+        plt.rcParams['font.family'] = 'MS Gothic'
+    else:
+        # macOS/Linuxの場合
+        plt.rcParams['font.family'] = ['Hiragino Sans', 'Yu Gothic', 'Meiryo', 'sans-serif']
+    
+    plt.rcParams['axes.unicode_minus'] = False
+    # フォントサイズも調整
+    plt.rcParams['font.size'] = 10
+    
+setup_japanese_font()
 
 def visualize_donut_pattern():
-    """ドーナツ化現象を複数の視点で可視化"""
+    """ドーナツ化現象を複数の視点で可視化（個別ファイル保存）"""
     
     # データ読み込み
     df = pd.read_csv('bike_log_donut.csv')
@@ -22,11 +37,11 @@ def visualize_donut_pattern():
     df['hour'] = df['timestamp'].dt.hour
     df['minute'] = df['timestamp'].dt.minute
     
-    # 図の作成
-    fig = plt.figure(figsize=(18, 12))
+    print("\n各グラフを個別に生成します...")
     
     # 1. 時間帯別平均台数の推移（都心部 vs 郊外部）
-    ax1 = plt.subplot(2, 3, 1)
+    print("  [1/6] 時間帯別推移グラフ...")
+    fig1, ax1 = plt.subplots(figsize=(10, 6))
     
     downtown_hourly = df[df['area_type'] == 'downtown'].groupby('hour')['free_bikes'].mean()
     suburb_hourly = df[df['area_type'] == 'suburb'].groupby('hour')['free_bikes'].mean()
@@ -46,9 +61,13 @@ def visualize_donut_pattern():
     ax1.legend(fontsize=10)
     ax1.grid(True, alpha=0.3)
     ax1.set_xticks(range(0, 24, 2))
+    plt.tight_layout()
+    plt.savefig('donut_1_time_series.png', dpi=300, bbox_inches='tight')
+    plt.close()
     
     # 2. 変動率の可視化（前時間帯との差分）
-    ax2 = plt.subplot(2, 3, 2)
+    print("  [2/6] 変動量グラフ...")
+    fig2, ax2 = plt.subplots(figsize=(10, 6))
     
     downtown_change = downtown_hourly.diff().fillna(0)
     suburb_change = suburb_hourly.diff().fillna(0)
@@ -67,9 +86,13 @@ def visualize_donut_pattern():
     ax2.grid(True, alpha=0.3, axis='y')
     ax2.set_xticks(range(0, 24, 2))
     ax2.set_xticklabels(range(0, 24, 2))
+    plt.tight_layout()
+    plt.savefig('donut_2_change_rate.png', dpi=300, bbox_inches='tight')
+    plt.close()
     
     # 3. ステーション別ヒートマップ（都心部）
-    ax3 = plt.subplot(2, 3, 3)
+    print("  [3/6] 都心部ヒートマップ...")
+    fig3, ax3 = plt.subplots(figsize=(12, 8))
     
     downtown_pivot = df[df['area_type'] == 'downtown'].pivot_table(
         values='free_bikes', 
@@ -82,9 +105,13 @@ def visualize_donut_pattern():
     ax3.set_title('都心部ステーション時間別ヒートマップ', fontsize=14, fontweight='bold')
     ax3.set_xlabel('時刻', fontsize=12)
     ax3.set_ylabel('ステーション名', fontsize=12)
+    plt.tight_layout()
+    plt.savefig('donut_3_downtown_heatmap.png', dpi=300, bbox_inches='tight')
+    plt.close()
     
     # 4. ステーション別ヒートマップ（郊外部）
-    ax4 = plt.subplot(2, 3, 4)
+    print("  [4/6] 郊外部ヒートマップ...")
+    fig4, ax4 = plt.subplots(figsize=(12, 8))
     
     suburb_pivot = df[df['area_type'] == 'suburb'].pivot_table(
         values='free_bikes', 
@@ -97,9 +124,13 @@ def visualize_donut_pattern():
     ax4.set_title('郊外部ステーション時間別ヒートマップ', fontsize=14, fontweight='bold')
     ax4.set_xlabel('時刻', fontsize=12)
     ax4.set_ylabel('ステーション名', fontsize=12)
+    plt.tight_layout()
+    plt.savefig('donut_4_suburb_heatmap.png', dpi=300, bbox_inches='tight')
+    plt.close()
     
     # 5. 逆相関の証明（散布図）
-    ax5 = plt.subplot(2, 3, 5)
+    print("  [5/6] 相関散布図...")
+    fig5, ax5 = plt.subplots(figsize=(10, 8))
     
     hourly_avg = df.groupby(['hour', 'area_type'])['free_bikes'].mean().unstack()
     
@@ -127,9 +158,13 @@ def visualize_donut_pattern():
     sm.set_array([])
     cbar = plt.colorbar(sm, ax=ax5)
     cbar.set_label('時刻', fontsize=10)
+    plt.tight_layout()
+    plt.savefig('donut_5_correlation.png', dpi=300, bbox_inches='tight')
+    plt.close()
     
     # 6. 統計サマリー
-    ax6 = plt.subplot(2, 3, 6)
+    print("  [6/6] 統計サマリー...")
+    fig6, ax6 = plt.subplots(figsize=(10, 8))
     ax6.axis('off')
     
     # 統計情報を計算
@@ -143,28 +178,28 @@ def visualize_donut_pattern():
     suburb_max_hour = suburb_stats['mean'].idxmax()
     
     summary_text = f"""
-    【ドーナツ化現象の統計サマリー】
-    
-    ■ 都心部（オフィス街）
-      • 最少時刻: {downtown_min_hour}時 ({downtown_stats.loc[downtown_min_hour, 'mean']:.1f}台)
-      • 最多時刻: {downtown_max_hour}時 ({downtown_stats.loc[downtown_max_hour, 'mean']:.1f}台)
-      • 変動幅: {downtown_stats['mean'].max() - downtown_stats['mean'].min():.1f}台
-      • 平均台数: {df[df['area_type']=='downtown']['free_bikes'].mean():.1f}台
-    
-    ■ 郊外部（住宅街）
-      • 最少時刻: {suburb_min_hour}時 ({suburb_stats.loc[suburb_min_hour, 'mean']:.1f}台)
-      • 最多時刻: {suburb_max_hour}時 ({suburb_stats.loc[suburb_max_hour, 'mean']:.1f}台)
-      • 変動幅: {suburb_stats['mean'].max() - suburb_stats['mean'].min():.1f}台
-      • 平均台数: {df[df['area_type']=='suburb']['free_bikes'].mean():.1f}台
-    
-    ■ 相関分析
-      • 相関係数: {correlation:.3f} (負の相関)
-      • データ数: {len(df):,} レコード
-      • 期間: 平日24時間
-    
-    ■ ドーナツ化現象の特徴
-      朝: 都心部↓ 郊外部↑ (通勤)
-      夕: 都心部↑ 郊外部↓ (帰宅)
+【ドーナツ化現象の統計サマリー】
+
+■ 都心部（オフィス街）
+  • 最少時刻: {downtown_min_hour}時 ({downtown_stats.loc[downtown_min_hour, 'mean']:.1f}台)
+  • 最多時刻: {downtown_max_hour}時 ({downtown_stats.loc[downtown_max_hour, 'mean']:.1f}台)
+  • 変動幅: {downtown_stats['mean'].max() - downtown_stats['mean'].min():.1f}台
+  • 平均台数: {df[df['area_type']=='downtown']['free_bikes'].mean():.1f}台
+
+■ 郊外部（住宅街）
+  • 最少時刻: {suburb_min_hour}時 ({suburb_stats.loc[suburb_min_hour, 'mean']:.1f}台)
+  • 最多時刻: {suburb_max_hour}時 ({suburb_stats.loc[suburb_max_hour, 'mean']:.1f}台)
+  • 変動幅: {suburb_stats['mean'].max() - suburb_stats['mean'].min():.1f}台
+  • 平均台数: {df[df['area_type']=='suburb']['free_bikes'].mean():.1f}台
+
+■ 相関分析
+  • 相関係数: {correlation:.3f} (負の相関)
+  • データ数: {len(df):,} レコード
+  • 期間: 平日24時間
+
+■ ドーナツ化現象の特徴
+  朝: 都心部↓ 郊外部↑ (通勤)
+  夕: 都心部↑ 郊外部↓ (帰宅)
     """
     
     ax6.text(0.1, 0.95, summary_text, transform=ax6.transAxes,
@@ -173,9 +208,16 @@ def visualize_donut_pattern():
              family='monospace')
     
     plt.tight_layout()
-    plt.savefig('donut_pattern_analysis.png', dpi=300, bbox_inches='tight')
-    print("✓ donut_pattern_analysis.png を保存しました")
-    plt.show()
+    plt.savefig('donut_6_summary.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print("\n✓ すべてのグラフを個別ファイルとして保存しました:")
+    print("  - donut_1_time_series.png")
+    print("  - donut_2_change_rate.png")
+    print("  - donut_3_downtown_heatmap.png")
+    print("  - donut_4_suburb_heatmap.png")
+    print("  - donut_5_correlation.png")
+    print("  - donut_6_summary.png")
     
     # 追加の詳細分析
     print("\n" + "=" * 60)
