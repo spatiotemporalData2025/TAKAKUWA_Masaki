@@ -2,6 +2,7 @@
 
 ## チーム・学修番号・名前
 - 高鍬 真輝（TAKAKUWA Masaki）
+- スライド(https://docs.google.com/presentation/d/1-Chxu-B_663XZ7kWV9LbUA3nGM9prHKop2RneQfn3ok/edit?slide=id.g3bc372894f1_5_127#slide=id.g3bc372894f1_5_127)
 
 ## 実装システム名
 **自転車シェアリングリアルタイム分析・可視化システム**
